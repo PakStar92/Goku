@@ -7,12 +7,11 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/PakStar92/Goku/routes" // Import the routes package
 	"github.com/rs/cors"
 )
 
 func main() {
-	// Load environment variables (if using .env, use a package like "github.com/joho/godotenv")
+	// Load environment variables
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3000" // Default port
@@ -23,13 +22,15 @@ func main() {
 
 	// Middleware
 	router.Use(cors.Default().Handler) // CORS middleware
-	// SSL middleware is not directly available in Go; you would typically handle this at the reverse proxy level (e.g., Nginx, Caddy)
 
 	// Serve static files
 	router.PathPrefix("/public/").Handler(http.StripPrefix("/public/", http.FileServer(http.Dir("public"))))
 
-	// Initialize routes
-	routes.InitRoutes(router)
+	// Register API routes
+	RegisterAPIRoutes(router)
+
+	// Register main routes (for serving HTML files)
+	RegisterMainRoutes(router)
 
 	// Start the server
 	log.Printf("Server started at :%s\n", port)
