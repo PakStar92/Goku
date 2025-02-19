@@ -8,7 +8,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
-	"./routes" // Import the routes package
+	"api-qasim/routes" // Import the routes package
 )
 
 func main() {
