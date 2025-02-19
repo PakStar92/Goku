@@ -8,6 +8,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
+	"./routes" // Import the routes package
 )
 
 func main() {
@@ -27,10 +28,10 @@ func main() {
 	router.PathPrefix("/public/").Handler(http.StripPrefix("/public/", http.FileServer(http.Dir("public"))))
 
 	// Register API routes
-	RegisterAPIRoutes(router)
+	routes.RegisterAPIRoutes(router)
 
 	// Register main routes (for serving HTML files)
-	RegisterMainRoutes(router)
+	routes.RegisterMainRoutes(router)
 
 	// Start the server
 	log.Printf("Server started at :%s\n", port)
