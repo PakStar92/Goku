@@ -219,46 +219,30 @@ func downloadYouTubeVideo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract available formats (video and audio)
-	formats := make([]map[string]interface{}, 0)
-	for _, format := range video.Formats {
-		formats = append(formats, map[string]interface{}{
-			"itag":          format.ItagNo,
-			"url":           format.URL,
-			"mimeType":      format.MimeType,
-			"quality":       format.Quality,
-			"qualityLabel":  format.QualityLabel,
-			"audioChannels": format.AudioChannels,
-			"bitrate":       format.Bitrate,
-			"fps":           format.FPS,
-			"width":         format.Width,
-			"height":        format.Height,
-		})
-	}
+	// Convert video struct to map
+	videoMap := structToMap(video)
 
-	// Extract thumbnails
-	thumbnails := make([]map[string]interface{}, 0)
-	for _, thumbnail := range video.Thumbnails {
-		thumbnails = append(thumbnails, map[string]interface{}{
-			"url":    thumbnail.URL,
-			"width":  thumbnail.Width,
-			"height": thumbnail.Height,
-		})
-	}
+	// Add creator field to the response
+	videoMap["creator"] = creator
 
 	// Respond with all video info
-	respondWithJSON(w, http.StatusOK, map[string]interface{}{
-		"status":      true,
-		"creator":     creator,
-		"title":       video.Title,
-		"author":      video.Author,
-		"description": video.Description,
-		"length":      video.Duration.String(),
-		"viewCount":   video.ViewCount,
-		"publishDate": video.PublishDate,
-		"formats":     formats,
-		"thumbnails":  thumbnails,
-	})
+	respondWithJSON(w, http.StatusOK, videoMap)
+}
+
+// structToMap converts a struct to a map using reflection
+func structToMap(obj interface{}) map[string]interface{} {
+	out := make(map[string]interface{})
+	v := reflect.ValueOf(obj)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	t := v.Type()
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i)
+		fieldName := t.Field(i).Name
+		out[fieldName] = field.Interface()
+	}
+	return out
 }
 
 // isValidAPIKey checks if the provided API key is valid
