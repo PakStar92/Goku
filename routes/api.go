@@ -186,7 +186,6 @@ func generateQRCode(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// downloadYouTubeVideo handles the GET /ytdl endpoint
 func downloadYouTubeVideo(w http.ResponseWriter, r *http.Request) {
 	// Validate API key
 	apiKey := r.URL.Query().Get("apikey")
@@ -220,13 +219,45 @@ func downloadYouTubeVideo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Respond with video info
+	// Extract available formats (video and audio)
+	formats := make([]map[string]interface{}, 0)
+	for _, format := range video.Formats {
+		formats = append(formats, map[string]interface{}{
+			"itag":          format.ItagNo,
+			"url":           format.URL,
+			"mimeType":      format.MimeType,
+			"quality":       format.Quality,
+			"qualityLabel":  format.QualityLabel,
+			"audioChannels": format.AudioChannels,
+			"bitrate":       format.Bitrate,
+			"fps":           format.FPS,
+			"width":         format.Width,
+			"height":        format.Height,
+		})
+	}
+
+	// Extract thumbnails
+	thumbnails := make([]map[string]interface{}, 0)
+	for _, thumbnail := range video.Thumbnails {
+		thumbnails = append(thumbnails, map[string]interface{}{
+			"url":    thumbnail.URL,
+			"width":  thumbnail.Width,
+			"height": thumbnail.Height,
+		})
+	}
+
+	// Respond with all video info
 	respondWithJSON(w, http.StatusOK, map[string]interface{}{
-		"status":  true,
-		"creator": creator,
-		"title":   video.Title,
-		"author":  video.Author,
-		"length":  video.Duration.String(),
+		"status":      true,
+		"creator":     creator,
+		"title":       video.Title,
+		"author":      video.Author,
+		"description": video.Description,
+		"length":      video.Duration.String(),
+		"viewCount":   video.ViewCount,
+		"publishDate": video.PublishDate,
+		"formats":     formats,
+		"thumbnails":  thumbnails,
 	})
 }
 
