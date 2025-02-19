@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"time"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
