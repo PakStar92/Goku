@@ -71,17 +71,40 @@ var listkey = []string{"Suhail", "GURU", "APIKEY"}
 
 // RegisterAPIRoutes sets up the API routes
 func RegisterAPIRoutes(router *mux.Router) {
+	// GET /apikey - Check if API key is valid
+	router.HandleFunc("/apikey", getAPIKey).Methods("GET")
+
 	// POST /apikey - Add a new API key
 	router.HandleFunc("/apikey", addAPIKey).Methods("POST")
 
 	// DELETE /apikey - Delete an API key
 	router.HandleFunc("/apikey", deleteAPIKey).Methods("DELETE")
 
-	// POST /qrcode - Generate QR Code
-	router.HandleFunc("/qrcode", generateQRCode).Methods("POST")
+	// GET /qrcode - Generate QR Code
+	router.HandleFunc("/qrcode", generateQRCode).Methods("GET")
 
-	// POST /ytdl - Download YouTube video
-	router.HandleFunc("/ytdl", downloadYouTubeVideo).Methods("POST")
+	// GET /ytdl - Download YouTube video info
+	router.HandleFunc("/ytdl", downloadYouTubeVideo).Methods("GET")
+}
+
+// getAPIKey handles the GET /apikey endpoint
+func getAPIKey(w http.ResponseWriter, r *http.Request) {
+	key := r.URL.Query().Get("key")
+	if key == "" {
+		respondWithError(w, loghandler["notparam"])
+		return
+	}
+
+	if !isValidAPIKey(key) {
+		respondWithError(w, loghandler["invalidKey"])
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, map[string]interface{}{
+		"status":  true,
+		"creator": creator,
+		"message": "API key is valid",
+	})
 }
 
 // addAPIKey handles the POST /apikey endpoint
@@ -128,7 +151,7 @@ func deleteAPIKey(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusOK, map[string]string{"message": "API key successfully deleted"})
 }
 
-// generateQRCode handles the POST /qrcode endpoint
+// generateQRCode handles the GET /qrcode endpoint
 func generateQRCode(w http.ResponseWriter, r *http.Request) {
 	// Validate API key
 	apiKey := r.URL.Query().Get("apikey")
@@ -155,12 +178,15 @@ func generateQRCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Return QR code as PNG image
-	w.Header().Set("Content-Type", "image/png")
-	w.Write(qrCode)
+	// Return QR code as base64-encoded JSON
+	respondWithJSON(w, http.StatusOK, map[string]interface{}{
+		"status":  true,
+		"creator": creator,
+		"qrcode":  qrCode,
+	})
 }
 
-// downloadYouTubeVideo handles the POST /ytdl endpoint
+// downloadYouTubeVideo handles the GET /ytdl endpoint
 func downloadYouTubeVideo(w http.ResponseWriter, r *http.Request) {
 	// Validate API key
 	apiKey := r.URL.Query().Get("apikey")
