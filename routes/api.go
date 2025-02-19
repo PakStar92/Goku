@@ -1,12 +1,13 @@
-package main
+package routes
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"strings"
 
 	"github.com/gorilla/mux"
+	"github.com/skip2/go-qrcode" // For QR code generation
+	"github.com/kkdai/youtube/v2" // For YouTube download
 )
 
 // Creator name
@@ -68,13 +69,19 @@ var errorMessage = ErrorMessage{
 // List of valid API keys
 var listkey = []string{"Suhail", "GURU", "APIKEY"}
 
-// RegisterRoutes sets up the API routes
-func RegisterRoutes(router *mux.Router) {
+// RegisterAPIRoutes sets up the API routes
+func RegisterAPIRoutes(router *mux.Router) {
 	// POST /apikey - Add a new API key
 	router.HandleFunc("/apikey", addAPIKey).Methods("POST")
 
 	// DELETE /apikey - Delete an API key
 	router.HandleFunc("/apikey", deleteAPIKey).Methods("DELETE")
+
+	// POST /qrcode - Generate QR Code
+	router.HandleFunc("/qrcode", generateQRCode).Methods("POST")
+
+	// POST /ytdl - Download YouTube video
+	router.HandleFunc("/ytdl", downloadYouTubeVideo).Methods("POST")
 }
 
 // addAPIKey handles the POST /apikey endpoint
@@ -119,6 +126,92 @@ func deleteAPIKey(w http.ResponseWriter, r *http.Request) {
 
 	listkey = append(listkey[:index], listkey[index+1:]...)
 	respondWithJSON(w, http.StatusOK, map[string]string{"message": "API key successfully deleted"})
+}
+
+// generateQRCode handles the POST /qrcode endpoint
+func generateQRCode(w http.ResponseWriter, r *http.Request) {
+	// Validate API key
+	apiKey := r.URL.Query().Get("apikey")
+	if !isValidAPIKey(apiKey) {
+		respondWithError(w, loghandler["invalidKey"])
+		return
+	}
+
+	// Get text from query parameters
+	text := r.URL.Query().Get("text")
+	if text == "" {
+		respondWithError(w, loghandler["nottext"])
+		return
+	}
+
+	// Generate QR code
+	qrCode, err := qrcode.Encode(text, qrcode.Medium, 256)
+	if err != nil {
+		respondWithError(w, ErrorMessage{
+			Status:  false,
+			Creator: creator,
+			Message: "Failed to generate QR code",
+		})
+		return
+	}
+
+	// Return QR code as PNG image
+	w.Header().Set("Content-Type", "image/png")
+	w.Write(qrCode)
+}
+
+// downloadYouTubeVideo handles the POST /ytdl endpoint
+func downloadYouTubeVideo(w http.ResponseWriter, r *http.Request) {
+	// Validate API key
+	apiKey := r.URL.Query().Get("apikey")
+	if !isValidAPIKey(apiKey) {
+		respondWithError(w, loghandler["invalidKey"])
+		return
+	}
+
+	// Get YouTube URL from query parameters
+	url := r.URL.Query().Get("url")
+	if url == "" {
+		respondWithError(w, loghandler["noturl"])
+		return
+	}
+
+	// Validate YouTube URL
+	if !strings.Contains(url, "youtube.com") && !strings.Contains(url, "youtu.be") {
+		respondWithError(w, invalidlink)
+		return
+	}
+
+	// Download YouTube video info
+	client := youtube.Client{}
+	video, err := client.GetVideo(url)
+	if err != nil {
+		respondWithError(w, ErrorMessage{
+			Status:  false,
+			Creator: creator,
+			Message: "Failed to fetch YouTube video info",
+		})
+		return
+	}
+
+	// Respond with video info
+	respondWithJSON(w, http.StatusOK, map[string]interface{}{
+		"status":  true,
+		"creator": creator,
+		"title":   video.Title,
+		"author":  video.Author,
+		"length":  video.Duration.String(),
+	})
+}
+
+// isValidAPIKey checks if the provided API key is valid
+func isValidAPIKey(apiKey string) bool {
+	for _, key := range listkey {
+		if key == apiKey {
+			return true
+		}
+	}
+	return false
 }
 
 // respondWithError sends an error response in JSON format
