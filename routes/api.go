@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
 	"github.com/skip2/go-qrcode" // For QR code generation
 	"github.com/kkdai/youtube/v2" // For YouTube download
 )
