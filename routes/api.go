@@ -4,9 +4,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
-
 	"github.com/gorilla/mux"
-	"github.com/joho/godotenv"
+	"github.com/rylio/ytdl"
+	"os"
+	"fmt"
 	"github.com/skip2/go-qrcode" // For QR code generation
 	"github.com/kkdai/youtube/v2" // For YouTube download
 )
@@ -187,6 +188,7 @@ func generateQRCode(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// downloadYouTubeVideo handles the YouTube video/audio download
 func downloadYouTubeVideo(w http.ResponseWriter, r *http.Request) {
 	// Validate API key
 	apiKey := r.URL.Query().Get("apikey")
@@ -208,9 +210,8 @@ func downloadYouTubeVideo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Download YouTube video info
-	client := youtube.Client{}
-	video, err := client.GetVideo(url)
+	// Use ytdl to fetch video info
+	videoInfo, err := ytdl.GetVideoInfo(url)
 	if err != nil {
 		respondWithError(w, ErrorMessage{
 			Status:  false,
@@ -220,30 +221,81 @@ func downloadYouTubeVideo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Convert video struct to map
-	videoMap := structToMap(video)
+	// Retrieve available formats
+	formats := videoInfo.Formats
 
-	// Add creator field to the response
-	videoMap["creator"] = creator
+	// Select the best audio or video format based on user preference
+	format := selectBestFormat(formats)
 
-	// Respond with all video info
-	respondWithJSON(w, http.StatusOK, videoMap)
+	// Start downloading the selected format
+	if err := downloadFromFormat(format, url, w); err != nil {
+		respondWithError(w, ErrorMessage{
+			Status:  false,
+			Creator: creator,
+			Message: "Failed to download the video/audio",
+		})
+		return
+	}
+
+	// Respond to user indicating the download is complete
+	respondWithJSON(w, http.StatusOK, map[string]interface{}{
+		"status":  "success",
+		"message": "Download complete",
+	})
 }
 
-// structToMap converts a struct to a map using reflection
-func structToMap(obj interface{}) map[string]interface{} {
-	out := make(map[string]interface{})
-	v := reflect.ValueOf(obj)
-	if v.Kind() == reflect.Ptr {
-		v = v.Elem()
+// selectBestFormat selects the best video or audio format (you can customize this logic)
+func selectBestFormat(formats []ytdl.Format) ytdl.Format {
+	var selectedFormat ytdl.Format
+	for _, format := range formats {
+		// Choose the best format for video (highest quality) or audio (best bitrate)
+		if format.HasVideo() && format.HasAudio() {
+			if selectedFormat.ID == "" || format.VideoQuality > selectedFormat.VideoQuality {
+				selectedFormat = format
+			}
+		} else if format.HasAudio() {
+			if selectedFormat.ID == "" || format.AudioBitrate > selectedFormat.AudioBitrate {
+				selectedFormat = format
+			}
+		}
 	}
-	t := v.Type()
-	for i := 0; i < v.NumField(); i++ {
-		field := v.Field(i)
-		fieldName := t.Field(i).Name
-		out[fieldName] = field.Interface()
+	return selectedFormat
+}
+
+// downloadFromFormat handles the actual download of video/audio in the selected format
+func downloadFromFormat(format ytdl.Format, url string, w http.ResponseWriter) error {
+	// Create a temp file to store the downloaded content
+	tempFile, err := os.CreateTemp("", "downloaded_video_*")
+	if err != nil {
+		return err
 	}
-	return out
+	defer tempFile.Close()
+
+	// Open the video/audio stream based on the selected format
+	downloadURL, err := format.DownloadURL(url)
+	if err != nil {
+		return err
+	}
+
+	// Open the stream for downloading
+	resp, err := http.Get(downloadURL.String())
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// Copy the content to the temp file
+	_, err = io.Copy(tempFile, resp.Body)
+	if err != nil {
+		return err
+	}
+
+	// Once the file is downloaded, send it as a response to the user
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", tempFile.Name()))
+	w.Header().Set("Content-Type", "application/octet-stream")
+	http.ServeFile(w, r, tempFile.Name())
+
+	return nil
 }
 
 // isValidAPIKey checks if the provided API key is valid
@@ -269,3 +321,4 @@ func respondWithJSON(w http.ResponseWriter, statusCode int, payload interface{})
 	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(payload)
 }
+
