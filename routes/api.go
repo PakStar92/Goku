@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"github.com/gorilla/mux"
-	"github.com/rylio/ytdl"
+	"github.com/Andreychik32/ytdl"
 	"os"
 	"fmt"
 	"github.com/skip2/go-qrcode" // For QR code generation
